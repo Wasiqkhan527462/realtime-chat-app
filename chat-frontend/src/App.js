@@ -22,7 +22,8 @@ function App() {
   const [createGroupOpen, setCreateGroupOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [selectedUsers, setSelectedUsers] = useState([]);
-  const [errorMessage, setErrorMessage] = useState('');
+  // const [errorMessage, setErrorMessage] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
     if (isLoggedIn && token) {
@@ -148,7 +149,6 @@ function App() {
   }, [isLoggedIn, socket]); // Run this effect if either `isLoggedIn` or `socket` changes
 
   // Login, logout, message sending, etc.
-
   const login = async () => {
     try {
       const response = await fetch('http://localhost:5000/api/auth/login', {
@@ -157,16 +157,26 @@ function App() {
         body: JSON.stringify({ email: username, password })
       });
       const data = await response.json();
-      if (data.token) {
+  
+      if (data.token && data._id) { // Check if user data is present
         localStorage.setItem('token', data.token);
         setToken(data.token);
+        setCurrentUser({
+          _id: data._id,
+          username: data.username,
+          email: data.email,
+          role: data.role,
+          organizationId: data.organizationId
+        });
         setIsLoggedIn(true);
+      } else {
+        console.error('Invalid login response', data);
       }
     } catch (error) {
       console.error('Login failed:', error);
     }
   };
-
+  
   const logout = () => {
     if (socket) {
       socket.disconnect();
@@ -253,8 +263,7 @@ function App() {
 
   const createGroup = () => {
     if (socket && newGroupName && selectedUsers.length > 0) {
-      const participants = socket.user.role === 'admin' ? selectedUsers : [...selectedUsers, socket.user._id];
-      
+      const participants = currentUser?.role === 'admin'? selectedUsers: [...selectedUsers, currentUser._id];
       socket.emit('createGroup', {
         name: newGroupName,
         participants
@@ -437,7 +446,11 @@ function App() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCreateGroupOpen(false)}>Cancel</Button>
-          <Button onClick={createGroup} variant="contained" disabled={!newGroupName || selectedUsers.length === 0}>
+          <Button
+            onClick={createGroup}
+            variant="contained"
+            disabled={!newGroupName || selectedUsers.length === 0 || !currentUser}
+          >
             Create
           </Button>
         </DialogActions>
